@@ -1,69 +1,124 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import EventWizard, { defaultBrief } from "@/components/EventWizard";
+import BudgetPanel from "@/components/BudgetPanel";
+import TimelinePanel from "@/components/TimelinePanel";
+import VendorPanel from "@/components/VendorPanel";
+import IdeasPanel from "@/components/IdeasPanel";
+import AccessibilityBar from "@/components/AccessibilityBar";
+import Tabs from "@/components/Tabs";
+import type { EventBrief } from "@/lib/types";
+import { useLocalStorageState } from "@/lib/useLocalStorageState";
+
+const BRIEF_STORAGE_KEY = "utsavai.brief";
+const NO_SAVED_BRIEF: EventBrief | null = null;
+
+const TABS = [
+  { id: "budget", label: "Budget" },
+  { id: "timeline", label: "Timeline" },
+  { id: "vendors", label: "Vendor Checklist" },
+  { id: "ideas", label: "AI Ideas" },
+];
 
 export default function Home() {
+  const [brief, setBrief] = useLocalStorageState<EventBrief | null>(
+    BRIEF_STORAGE_KEY,
+    NO_SAVED_BRIEF
+  );
+  const [activeTab, setActiveTab] = useState("budget");
+  // null = "no explicit choice yet" — defer to whether a saved brief exists.
+  const [editingOverride, setEditingOverride] = useState<boolean | null>(null);
+  const editing = editingOverride ?? brief === null;
+
+  function handleSubmit(b: EventBrief) {
+    setBrief(b);
+    setEditingOverride(false);
+    setActiveTab("budget");
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="flex min-h-screen flex-col">
+      <AccessibilityBar />
+
+      <header className="no-print border-b border-stone-200 bg-white px-4 py-5 dark:border-stone-800 dark:bg-stone-950 sm:px-8">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-amber-800 dark:text-amber-300">
+              🎉 UtsavAI
+            </h1>
+            <p className="text-sm text-stone-500">
+              GenAI co-planner for weddings, birthdays & community events
+            </p>
+          </div>
+          {brief && !editing && (
+            <button
+              type="button"
+              onClick={() => setEditingOverride(true)}
+              className="rounded-full border border-stone-300 px-4 py-2 text-sm hover:bg-stone-100 dark:border-stone-700 dark:hover:bg-stone-900"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              Edit event details
+            </button>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      <main id="main-content" className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-8">
+        {editing || !brief ? (
+          <section aria-label="Event setup">
+            <h2 className="mb-5 text-lg font-semibold">Tell us about your event</h2>
+            <EventWizard initial={brief ?? defaultBrief()} onSubmit={handleSubmit} />
+          </section>
+        ) : (
+          <section aria-label="Event plan">
+            <div className="no-print mb-6 flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {brief.occasion || brief.eventType} — {brief.guestCount} guests
+                </h2>
+                <p className="text-sm text-stone-500">
+                  ₹{brief.budgetInr.toLocaleString("en-IN")} budget ·{" "}
+                  {new Date(brief.eventDate).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-full border border-amber-700 px-4 py-2 text-sm text-amber-800 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950"
+              >
+                Export / Print plan
+              </button>
+            </div>
+
+            <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
+
+            <div className="py-6">
+              {TABS.map((tab) => (
+                <div
+                  key={tab.id}
+                  role="tabpanel"
+                  id={`panel-${tab.id}`}
+                  aria-labelledby={`tab-${tab.id}`}
+                  hidden={activeTab !== tab.id}
+                >
+                  {activeTab === tab.id && tab.id === "budget" && <BudgetPanel brief={brief} />}
+                  {activeTab === tab.id && tab.id === "timeline" && <TimelinePanel brief={brief} />}
+                  {activeTab === tab.id && tab.id === "vendors" && <VendorPanel brief={brief} />}
+                  {activeTab === tab.id && tab.id === "ideas" && <IdeasPanel brief={brief} />}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
+
+      <footer className="no-print border-t border-stone-200 px-4 py-4 text-center text-xs text-stone-400 dark:border-stone-800 sm:px-8">
+        UtsavAI stores your plan only in this browser — nothing is saved on a server.
+      </footer>
     </div>
   );
 }

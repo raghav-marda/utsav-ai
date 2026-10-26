@@ -8,8 +8,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +23,46 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* High-contrast accessibility mode, toggled by adding this class to <html>.
+   Bumps text/border contrast well past WCAG AA for low-vision users. */
+html.high-contrast {
+  filter: contrast(1.15);
+}
+html.high-contrast body {
+  background: #000000;
+  color: #ffffff;
+}
+html.high-contrast a,
+html.high-contrast button {
+  outline-offset: 2px;
+}
+html.high-contrast * {
+  border-color: #ffffff !important;
+}
+
+/* Large-text accessibility mode */
+html.large-text {
+  font-size: 118%;
+}
+
+/* Always-visible, high-contrast focus ring for keyboard navigation */
+:focus-visible {
+  outline: 3px solid #b4552e;
+  outline-offset: 2px;
+}
+html.high-contrast :focus-visible {
+  outline-color: #ffd60a;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
 }
