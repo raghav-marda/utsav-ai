@@ -25,8 +25,8 @@ while still giving the creative, personalized experience GenAI is good at.
 |---|---|
 | **Smart budget allocator** | A rules engine (`lib/budgetAllocator.ts`) allocates a user's total budget across event-specific categories (venue, catering, decor, photography, etc.), adjusted for event type, city tier, and planning style (lean/balanced/lavish). It also runs a **feasibility check**: it compares the resulting per-guest catering spend against real Indian per-plate benchmark ranges by city tier and flags when a budget is unrealistic for the guest count — a concrete, auditable judgment an LLM would otherwise hallucinate. |
 | **Countdown timeline** | A template-driven scheduler (`lib/timelineGenerator.ts`) generates a day-by-day task list (e.g. "book venue — 110 days before" for a wedding) and gracefully compresses into a "do this now" bucket when the event is close, so a last-minute planner still gets a usable plan instead of a timeline that assumes months of runway. Progress is checkable and persists in the browser. |
-| **Vendor checklists** | Every vendor category (venue, caterer, photographer, decorator, etc.) ships with a fixed baseline of questions every user should ask — so the checklist is never empty, generic, or dependent on an API call succeeding. An optional **"✨ Get AI tips"** button calls Claude to add 3–5 *new*, event-specific follow-up questions and a negotiation tip, without repeating the baseline. |
-| **Personalized ideas** | A chat-free "Generate ideas" panel sends the structured event brief (type, guest count, budget, style, free-text preferences) to Claude and gets back a themed set of concrete, regionally-grounded suggestions with an estimated cost impact (low/medium/high) per idea — validated against a strict schema before it's ever rendered. |
+| **Vendor checklists** | Every vendor category (venue, caterer, photographer, decorator, etc.) ships with a fixed baseline of questions every user should ask — so the checklist is never empty, generic, or dependent on an API call succeeding. An optional **"✨ Get AI tips"** button calls Gemini to add 3–5 *new*, event-specific follow-up questions and a negotiation tip, without repeating the baseline. |
+| **Personalized ideas** | A chat-free "Generate ideas" panel sends the structured event brief (type, guest count, budget, style, free-text preferences) to Gemini and gets back a themed set of concrete, regionally-grounded suggestions with an estimated cost impact (low/medium/high) per idea — validated against a strict schema before it's ever rendered. |
 
 ## Architecture
 
@@ -40,7 +40,7 @@ lib/
   budgetAllocator.ts         — deterministic budget rules engine + feasibility checker
   timelineGenerator.ts       — deterministic timeline template engine
   vendorChecklist.ts         — static vendor question baselines per event type
-  llmService.ts               — the ONLY module that calls the Anthropic API; validates responses with zod
+  llmService.ts               — the ONLY module that calls the Gemini API; validates responses with zod
   validation.ts               — zod schemas for every value crossing the client→server boundary
   rateLimit.ts                 — in-memory sliding-window limiter for the two LLM-backed routes
   useLocalStorageState.ts      — useSyncExternalStore-backed persistence hook (see Code Quality below)
@@ -112,7 +112,7 @@ vendor categories rather than a generic, region-agnostic template.
 
 ```bash
 npm install
-cp .env.example .env.local   # add your ANTHROPIC_API_KEY
+cp .env.example .env.local   # add your GEMINI_API_KEY
 npm run dev                  # http://localhost:3000
 ```
 
@@ -131,14 +131,16 @@ config) or any Node host:
 
 1. Push this repo to GitHub.
 2. Import it into [Vercel](https://vercel.com/new).
-3. Add the `ANTHROPIC_API_KEY` environment variable in the Vercel project
+3. Add the `GEMINI_API_KEY` environment variable in the Vercel project
    settings (Settings → Environment Variables).
 4. Deploy. No other configuration is required.
 
 ## Gen AI services used
 
-Anthropic Claude (`claude-sonnet-4-5` by default, configurable via
-`ANTHROPIC_MODEL`) via the official `@anthropic-ai/sdk`, used in exactly two
-places: generating personalized event ideas, and generating personalized
-vendor follow-up questions. All other logic (budgeting, scheduling,
-feasibility checks) is deterministic and does not call the model.
+Google Gemini (`gemini-2.5-flash` by default, configurable via `GEMINI_MODEL`,
+free tier) called over the REST API from server-side route handlers only, in
+exactly two places: personalized event ideas and personalized vendor
+follow-up questions. All other logic (budgeting, scheduling, feasibility
+checks) is deterministic and does not call the model. If the model is
+unavailable (no key, quota, timeout, malformed output) the routes serve
+curated deterministic content, so the app never shows a dead end.

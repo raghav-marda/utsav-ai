@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateIdeas } from "@/lib/llmService";
+import { fallbackIdeas } from "@/lib/fallbackContent";
 import { IdeaRequestSchema } from "@/lib/validation";
 import { clientKeyFrom, isRateLimited } from "@/lib/rateLimit";
 
@@ -28,12 +29,9 @@ export async function POST(req: Request) {
 
   try {
     const ideas = await generateIdeas(parsed.data.brief, parsed.data.focusArea);
-    return NextResponse.json({ ideas });
+    return NextResponse.json({ ideas, source: "ai" });
   } catch (err) {
-    console.error("generateIdeas failed:", err);
-    return NextResponse.json(
-      { error: "Could not generate ideas right now. Please try again shortly." },
-      { status: 502 }
-    );
+    console.error("generateIdeas failed, serving fallback:", err);
+    return NextResponse.json({ ideas: fallbackIdeas(parsed.data.brief), source: "fallback" });
   }
 }

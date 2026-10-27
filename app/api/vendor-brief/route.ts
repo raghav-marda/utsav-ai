@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateVendorBrief } from "@/lib/llmService";
+import { fallbackVendorBrief } from "@/lib/fallbackContent";
 import { VendorBriefRequestSchema } from "@/lib/validation";
 import { vendorCategoriesFor } from "@/lib/vendorChecklist";
 import { clientKeyFrom, isRateLimited } from "@/lib/rateLimit";
@@ -40,12 +41,9 @@ export async function POST(req: Request) {
       category.label,
       category.baseQuestions
     );
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, source: "ai" });
   } catch (err) {
-    console.error("generateVendorBrief failed:", err);
-    return NextResponse.json(
-      { error: "Could not generate vendor tips right now. Please try again shortly." },
-      { status: 502 }
-    );
+    console.error("generateVendorBrief failed, serving fallback:", err);
+    return NextResponse.json({ ...fallbackVendorBrief(category.label), source: "fallback" });
   }
 }

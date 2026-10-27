@@ -1,29 +1,52 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { EventBrief } from "./types";
 
 // ---------------------------------------------------------------------------
-// The only module in this app that talks to an LLM. Deliberately thin: it
-// takes an already-validated EventBrief (never raw request bodies), builds a
-// constrained prompt, and validates the model's JSON response against a zod
-// schema before anything downstream sees it. If the model returns malformed
-// JSON or the wrong shape, this throws — callers fall back to a static
-// response rather than ever rendering unvalidated model output.
+// The only module that talks to an LLM (Google Gemini, free tier). Deliberately
+// thin: it takes an already-validated EventBrief (never raw request bodies),
+// builds a constrained prompt, and validates the model's JSON response
+// against a zod schema before anything downstream sees it. If the model
+// returns malformed JSON or the wrong shape, this throws — API routes then
+// fall back to deterministic content instead of rendering unvalidated output.
 // ---------------------------------------------------------------------------
 
-let client: Anthropic | null = null;
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const REQUEST_TIMEOUT_MS = 20_000;
 
-function getClient(): Anthropic {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured on the server.");
+async function callModel(system: string, user: string, maxTokens: number): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured on the server.");
   }
-  if (!client) {
-    client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: user }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: maxTokens,
+          temperature: 0.8,
+        },
+      }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Gemini API error: HTTP ${res.status}`);
   }
-  return client;
+  const json = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = (json.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+  if (!text) throw new Error("Gemini returned an empty response.");
+  return text;
 }
-
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
 
 // --- Idea generation -------------------------------------------------------
 
@@ -71,8 +94,6 @@ export async function generateIdeas(
   brief: EventBrief,
   focusArea?: string
 ): Promise<IdeaResponse> {
-  const anthropic = getClient();
-
   const userPrompt = `EVENT FACTS:
 ${briefToPromptFacts(brief)}
 ${focusArea ? `Focus area requested: ${focusArea}` : ""}
@@ -91,17 +112,7 @@ Return JSON with this exact shape:
   ] // 4-5 concrete, actionable ideas
 }`;
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 1200,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+  const text = await callModel(SYSTEM_PROMPT, userPrompt, 1200);
 
   const parsed = extractJson(text);
   return IdeaSchema.parse(parsed);
@@ -121,8 +132,6 @@ export async function generateVendorBrief(
   vendorLabel: string,
   baseQuestions: string[]
 ): Promise<VendorBriefResponse> {
-  const anthropic = getClient();
-
   const userPrompt = `EVENT FACTS:
 ${briefToPromptFacts(brief)}
 
@@ -140,17 +149,7 @@ Return JSON with this exact shape:
   "negotiationTip": string        // one practical, India-specific negotiation or timing tip for this vendor category
 }`;
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 600,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
+  const text = await callModel(SYSTEM_PROMPT, userPrompt, 600);
 
   const parsed = extractJson(text);
   return VendorBriefSchema.parse(parsed);

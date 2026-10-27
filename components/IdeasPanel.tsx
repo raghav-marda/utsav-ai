@@ -15,6 +15,7 @@ export default function IdeasPanel({ brief }: { brief: EventBrief }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<IdeaResponse | null>(null);
+  const [isFallback, setIsFallback] = useState(false);
 
   async function fetchIdeas() {
     setLoading(true);
@@ -31,6 +32,7 @@ export default function IdeasPanel({ brief }: { brief: EventBrief }) {
       }
       const json = await res.json();
       setData(json.ideas as IdeaResponse);
+      setIsFallback(json.source === "fallback");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -66,6 +68,12 @@ export default function IdeasPanel({ brief }: { brief: EventBrief }) {
       {error && (
         <p role="alert" className="text-sm text-red-600">
           {error}
+        </p>
+      )}
+
+      {data && isFallback && (
+        <p role="status" className="text-xs text-stone-500">
+          AI is busy right now, so these are curated suggestions for your event type.
         </p>
       )}
 
