@@ -14,8 +14,8 @@ personalized suggestions). This keeps the numbers a user is trusting with
 real rupees auditable and reproducible instead of left to an LLM's "vibes",
 while still giving the creative, personalized experience GenAI is good at.
 
-**Live demo:** _add your deployed URL here before submitting_
-**Repo:** `github.com/<your-username>/utsav-ai`
+**Live demo:** https://utsav-ai-nu.vercel.app
+**Repo:** `github.com/raghav-marda/utsav-ai`
 
 ---
 
