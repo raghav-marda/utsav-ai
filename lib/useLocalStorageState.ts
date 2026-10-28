@@ -30,15 +30,32 @@ export function useLocalStorageState<T>(
   // expected to change across the component's lifetime.
   const fallbackRef = useRef(fallback);
 
+  // useSyncExternalStore requires getSnapshot to return the SAME reference
+  // until the underlying data changes. JSON.parse returns a fresh object on
+  // every call, so we cache the parsed value keyed by the raw string.
+  const cacheRef = useRef<{ key: string; raw: string | null; parsed: T } | null>(null);
+
   const getSnapshot = useCallback((): T => {
     if (typeof window === "undefined") return fallbackRef.current;
+    let raw: string | null = null;
     try {
-      const raw = window.localStorage.getItem(key);
-      if (raw === null) return fallbackRef.current;
-      return JSON.parse(raw) as T;
+      raw = window.localStorage.getItem(key);
     } catch {
       return fallbackRef.current;
     }
+    const cached = cacheRef.current;
+    if (cached && cached.key === key && cached.raw === raw) return cached.parsed;
+
+    let parsed: T = fallbackRef.current;
+    if (raw !== null) {
+      try {
+        parsed = JSON.parse(raw) as T;
+      } catch {
+        parsed = fallbackRef.current;
+      }
+    }
+    cacheRef.current = { key, raw, parsed };
+    return parsed;
   }, [key]);
 
   const getServerSnapshot = useCallback((): T => fallbackRef.current, []);
